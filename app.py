@@ -22,12 +22,13 @@ CORS(app, resources={
     }
 })
 
-# Configure OpenAI with organization
+# Configure OpenAI
 api_key = os.getenv('OPENAI_API_KEY')
 if not api_key:
     logger.error("OpenAI API key is not set!")
 
 openai.api_key = api_key
+openai.api_base = "https://api.openai.com/v1"  # Ensure we're using the correct base URL
 
 @app.route('/')
 def home():
@@ -39,11 +40,23 @@ def send_static(path):
 
 @app.route('/test')
 def test():
+    try:
+        # Test OpenAI API
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": "Hello"}],
+            max_tokens=5
+        )
+        api_test = "success"
+    except Exception as e:
+        api_test = f"failed: {str(e)}"
+
     return jsonify({
         "status": "ok",
         "message": "Test endpoint working",
         "openai_key_set": bool(openai.api_key),
-        "openai_key_length": len(openai.api_key) if openai.api_key else 0
+        "openai_key_length": len(openai.api_key) if openai.api_key else 0,
+        "openai_api_test": api_test
     })
 
 @app.route('/api/chat', methods=['POST', 'OPTIONS'])
@@ -103,8 +116,11 @@ def chat():
             
         except openai.error.OpenAIError as e:
             logger.error(f"OpenAI API error: {str(e)}")
+            error_msg = str(e)
+            if "auth" in error_msg.lower() or "api key" in error_msg.lower():
+                error_msg = "Authentication error with AI service. Please check API key configuration."
             return jsonify({
-                "error": f"OpenAI API error: {str(e)}",
+                "error": error_msg,
                 "status": "error"
             }), 500
     
