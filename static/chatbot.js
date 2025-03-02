@@ -121,11 +121,6 @@ class PanorixChatbot {
         document.head.appendChild(styles);
     }
 
-    toggleChat() {
-        const chatWindow = document.querySelector('.chat-window');
-        chatWindow.style.display = chatWindow.style.display === 'none' ? 'flex' : 'none';
-    }
-
     async sendMessage() {
         const input = document.querySelector('.chat-input input');
         const message = input.value.trim();
@@ -140,9 +135,16 @@ class PanorixChatbot {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Accept': 'application/json',
                 },
+                mode: 'cors',
+                credentials: 'omit',
                 body: JSON.stringify({ message }),
             });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
 
             const data = await response.json();
             
@@ -153,7 +155,7 @@ class PanorixChatbot {
             }
         } catch (error) {
             console.error('Chat error:', error);
-            this.addMessage('Sorry, I encountered an error. Please try again in a moment.', 'bot');
+            this.addMessage('Sorry, I encountered an error. Please try again in a moment. Error: ' + error.message, 'bot');
         } finally {
             this.isWaiting = false;
         }
@@ -172,6 +174,11 @@ class PanorixChatbot {
         if (event.key === 'Enter') {
             this.sendMessage();
         }
+    }
+
+    toggleChat() {
+        const chatWindow = document.querySelector('.chat-window');
+        chatWindow.style.display = chatWindow.style.display === 'none' ? 'flex' : 'none';
     }
 }
 

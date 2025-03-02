@@ -2,33 +2,57 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import openai
 import os
+import logging
 from dotenv import load_dotenv
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": "*"}})
+CORS(app, resources={
+    r"/*": {
+        "origins": ["https://panorixsolutions.com", "http://panorixsolutions.com"],
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type"]
+    }
+})
 
 # Configure OpenAI
 openai.api_key = os.getenv('OPENAI_API_KEY')
+if not openai.api_key:
+    logger.error("OpenAI API key is not set!")
+
+@app.route('/')
+def home():
+    return jsonify({"status": "healthy"})
 
 @app.route('/static/<path:path>')
 def send_static(path):
     return send_from_directory('static', path)
 
-@app.route('/api/chat', methods=['POST'])
+@app.route('/api/chat', methods=['POST', 'OPTIONS'])
 def chat():
-    try:
-        data = request.json
-        user_message = data.get('message', '')
+    if request.method == 'OPTIONS':
+        return '', 204
         
+    try:
+        logger.info("Received chat request")
+        data = request.json
+        logger.debug(f"Request data: {data}")
+        
+        user_message = data.get('message', '')
         if not user_message:
+            logger.warning("Empty message received")
             return jsonify({
                 "error": "Message cannot be empty",
                 "status": "error"
             }), 400
-        
+
+        logger.info(f"Making request to OpenAI with message: {user_message}")
         # Create chat completion with OpenAI
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
@@ -41,6 +65,7 @@ def chat():
         
         # Extract the assistant's response
         bot_response = response.choices[0].message.content
+        logger.info("Successfully got response from OpenAI")
         
         return jsonify({
             "response": bot_response,
@@ -48,7 +73,7 @@ def chat():
         })
     
     except Exception as e:
-        print(f"Error: {str(e)}")  # Log the error
+        logger.error(f"Error in chat endpoint: {str(e)}", exc_info=True)
         return jsonify({
             "error": str(e),
             "status": "error"
