@@ -3,6 +3,7 @@ from flask_cors import CORS
 import openai
 import os
 import logging
+import json
 from dotenv import load_dotenv
 
 # Configure logging
@@ -15,16 +16,18 @@ load_dotenv()
 app = Flask(__name__, static_folder='static')
 CORS(app, resources={
     r"/*": {
-        "origins": ["https://panorixsolutions.com", "http://panorixsolutions.com"],
+        "origins": ["https://panorixsolutions.com", "http://panorixsolutions.com", "http://localhost:5000"],
         "methods": ["GET", "POST", "OPTIONS"],
         "allow_headers": ["Content-Type", "Accept"]
     }
 })
 
-# Configure OpenAI
-openai.api_key = os.getenv('OPENAI_API_KEY')
-if not openai.api_key:
+# Configure OpenAI with organization
+api_key = os.getenv('OPENAI_API_KEY')
+if not api_key:
     logger.error("OpenAI API key is not set!")
+
+openai.api_key = api_key
 
 @app.route('/')
 def home():
@@ -39,7 +42,8 @@ def test():
     return jsonify({
         "status": "ok",
         "message": "Test endpoint working",
-        "openai_key_set": bool(openai.api_key)
+        "openai_key_set": bool(openai.api_key),
+        "openai_key_length": len(openai.api_key) if openai.api_key else 0
     })
 
 @app.route('/api/chat', methods=['POST', 'OPTIONS'])
@@ -51,8 +55,20 @@ def chat():
         logger.info("Received chat request")
         logger.info(f"Request headers: {dict(request.headers)}")
         
-        data = request.json
-        logger.debug(f"Request data: {data}")
+        # Log raw request data
+        raw_data = request.get_data()
+        logger.info(f"Raw request data: {raw_data}")
+        
+        try:
+            data = request.get_json()
+        except Exception as e:
+            logger.error(f"Failed to parse JSON: {e}")
+            return jsonify({
+                "error": "Invalid JSON data",
+                "status": "error"
+            }), 400
+            
+        logger.debug(f"Parsed request data: {data}")
         
         user_message = data.get('message', '')
         if not user_message:
@@ -63,29 +79,39 @@ def chat():
             }), 400
 
         logger.info(f"Making request to OpenAI with message: {user_message}")
-        # Create chat completion with OpenAI
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant for Panorix Solutions website. Be professional and concise in your responses."},
-                {"role": "user", "content": user_message}
-            ],
-            max_tokens=150
-        )
-        
-        # Extract the assistant's response
-        bot_response = response.choices[0].message.content
-        logger.info("Successfully got response from OpenAI")
-        
-        return jsonify({
-            "response": bot_response,
-            "status": "success"
-        })
+        try:
+            # Create chat completion with OpenAI
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant for Panorix Solutions website. Be professional and concise in your responses."},
+                    {"role": "user", "content": user_message}
+                ],
+                max_tokens=150,
+                temperature=0.7
+            )
+            
+            # Extract the assistant's response
+            bot_response = response.choices[0].message.content
+            logger.info("Successfully got response from OpenAI")
+            logger.debug(f"OpenAI response: {response}")
+            
+            return jsonify({
+                "response": bot_response,
+                "status": "success"
+            })
+            
+        except openai.error.OpenAIError as e:
+            logger.error(f"OpenAI API error: {str(e)}")
+            return jsonify({
+                "error": f"OpenAI API error: {str(e)}",
+                "status": "error"
+            }), 500
     
     except Exception as e:
         logger.error(f"Error in chat endpoint: {str(e)}", exc_info=True)
         return jsonify({
-            "error": str(e),
+            "error": f"Server error: {str(e)}",
             "status": "error"
         }), 500
 

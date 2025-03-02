@@ -139,23 +139,26 @@ class PanorixChatbot {
                 },
                 mode: 'cors',
                 credentials: 'omit',
-                body: JSON.stringify({ message }),
+                body: JSON.stringify({ 
+                    message: message 
+                })
             });
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
             const data = await response.json();
+            console.log('Server response:', data);  // Debug log
             
-            if (data.status === 'success') {
+            if (data.status === 'success' && data.response) {
                 this.addMessage(data.response, 'bot');
             } else {
-                throw new Error(data.error || 'Failed to get response');
+                throw new Error(data.error || 'Unknown error occurred');
             }
         } catch (error) {
             console.error('Chat error:', error);
-            this.addMessage('Sorry, I encountered an error. Please try again in a moment. Error: ' + error.message, 'bot');
+            let errorMessage = error.message;
+            if (errorMessage.includes('OpenAI API error')) {
+                errorMessage = 'Sorry, there was an issue with the AI service. Please try again in a moment.';
+            }
+            this.addMessage(errorMessage, 'bot');
         } finally {
             this.isWaiting = false;
         }
