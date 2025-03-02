@@ -12,12 +12,12 @@ logger = logging.getLogger(__name__)
 # Load environment variables
 load_dotenv()
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static')
 CORS(app, resources={
     r"/*": {
         "origins": ["https://panorixsolutions.com", "http://panorixsolutions.com"],
         "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type"]
+        "allow_headers": ["Content-Type", "Accept"]
     }
 })
 
@@ -34,6 +34,14 @@ def home():
 def send_static(path):
     return send_from_directory('static', path)
 
+@app.route('/test')
+def test():
+    return jsonify({
+        "status": "ok",
+        "message": "Test endpoint working",
+        "openai_key_set": bool(openai.api_key)
+    })
+
 @app.route('/api/chat', methods=['POST', 'OPTIONS'])
 def chat():
     if request.method == 'OPTIONS':
@@ -41,6 +49,8 @@ def chat():
         
     try:
         logger.info("Received chat request")
+        logger.info(f"Request headers: {dict(request.headers)}")
+        
         data = request.json
         logger.debug(f"Request data: {data}")
         
@@ -78,6 +88,9 @@ def chat():
             "error": str(e),
             "status": "error"
         }), 500
+
+# This is important for gunicorn
+application = app
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
