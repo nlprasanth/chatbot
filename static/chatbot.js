@@ -2,6 +2,7 @@ class PanorixChatbot {
     constructor() {
         this.createChatWidget();
         this.apiUrl = 'https://panorix-chatbot.onrender.com/api/chat'; // Updated Render URL
+        this.isWaiting = false;
     }
 
     createChatWidget() {
@@ -128,13 +129,13 @@ class PanorixChatbot {
     async sendMessage() {
         const input = document.querySelector('.chat-input input');
         const message = input.value.trim();
-        if (!message) return;
-
-        // Add user message to chat
-        this.addMessage(message, 'user');
-        input.value = '';
+        if (!message || this.isWaiting) return;
 
         try {
+            this.isWaiting = true;
+            this.addMessage(message, 'user');
+            input.value = '';
+
             const response = await fetch(this.apiUrl, {
                 method: 'POST',
                 headers: {
@@ -144,13 +145,17 @@ class PanorixChatbot {
             });
 
             const data = await response.json();
+            
             if (data.status === 'success') {
                 this.addMessage(data.response, 'bot');
             } else {
-                this.addMessage('Sorry, I encountered an error. Please try again.', 'bot');
+                throw new Error(data.error || 'Failed to get response');
             }
         } catch (error) {
-            this.addMessage('Sorry, I encountered an error. Please try again.', 'bot');
+            console.error('Chat error:', error);
+            this.addMessage('Sorry, I encountered an error. Please try again in a moment.', 'bot');
+        } finally {
+            this.isWaiting = false;
         }
     }
 
