@@ -1,7 +1,7 @@
 class PanorixChatbot {
     constructor() {
         this.createChatWidget();
-        this.apiUrl = 'http://localhost:5000/api/chat'; // Update this when deployed
+        this.apiUrl = 'https://panorix-chatbot.onrender.com/api/chat'; // Updated Render URL
     }
 
     createChatWidget() {
